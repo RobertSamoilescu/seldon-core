@@ -49,11 +49,8 @@ type ServerReconciler struct {
 //+kubebuilder:rbac:groups=mlops.seldon.io,resources=servers/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=mlops.seldon.io,resources=servers/finalizers,verbs=update
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
-// +kubebuilder:rbac:groups=v1,resources=services,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=v1,resources=services/status,verbs=get
-// +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=apps,resources=statefulsets/status,verbs=get
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -148,7 +145,7 @@ func serverReady(status mlopsv1alpha1.ServerStatus) bool {
 }
 
 func (r *ServerReconciler) updateStatusFromError(ctx context.Context, logger logr.Logger, server *mlopsv1alpha1.Server, err error) {
-	server.Status.CreateAndSetCondition(mlopsv1alpha1.StatefulSetReady, false, err.Error())
+	server.Status.CreateAndSetCondition(mlopsv1alpha1.DeploymentReady, false, err.Error())
 	if errSet := r.Status().Update(ctx, server); errSet != nil {
 		logger.Error(errSet, "Failed to set status for server on error", "server", server.Name, "error", err.Error())
 	}

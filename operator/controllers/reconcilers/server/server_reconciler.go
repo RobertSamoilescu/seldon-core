@@ -29,8 +29,7 @@ const (
 
 type ServerReconciler struct {
 	common.ReconcilerConfig
-	StatefulSetReconciler common.Reconciler
-	ServiceReconciler     common.Reconciler
+	DeploymentReconciler common.Reconciler
 }
 
 func NewServerReconciler(server *mlopsv1alpha1.Server,
@@ -45,54 +44,44 @@ func NewServerReconciler(server *mlopsv1alpha1.Server,
 
 	annotator := patch.NewAnnotator(constants.LastAppliedConfig)
 
-	sr.StatefulSetReconciler, err = sr.createStatefulSetReconciler(server, annotator)
+	sr.DeploymentReconciler, err = sr.createDeploymentReconciler(server, annotator)
 	if err != nil {
 		return nil, err
 	}
 
 	// Add last applied annotation to all resources
-	for _, res := range sr.StatefulSetReconciler.GetResources() {
+	for _, res := range sr.DeploymentReconciler.GetResources() {
 		if err := annotator.SetLastAppliedAnnotation(res); err != nil {
 			return nil, err
 		}
 	}
-
-	sr.ServiceReconciler = NewServerServiceReconciler(common, server.ObjectMeta, &server.Spec.ScalingSpec)
 	return sr, nil
 }
 
 func (s *ServerReconciler) GetLabelSelector() string {
-	return s.StatefulSetReconciler.(common.LabelHandler).GetLabelSelector()
+	return s.DeploymentReconciler.(common.LabelHandler).GetLabelSelector()
 }
 
 func (s *ServerReconciler) GetReplicas() (int32, error) {
-	return s.StatefulSetReconciler.(common.ReplicaHandler).GetReplicas()
+	return s.DeploymentReconciler.(common.ReplicaHandler).GetReplicas()
 }
 
 func (s *ServerReconciler) GetResources() []client.Object {
-	objs := s.StatefulSetReconciler.GetResources()
-	objs = append(objs, s.ServiceReconciler.GetResources()...)
+	objs := s.DeploymentReconciler.GetResources()
 	return objs
 }
 
 func (s *ServerReconciler) GetConditions() []*apis.Condition {
-	conditions := s.StatefulSetReconciler.GetConditions()
-	conditions = append(conditions, s.ServiceReconciler.GetConditions()...)
+	conditions := s.DeploymentReconciler.GetConditions()
 	return conditions
 }
 
 func (s *ServerReconciler) Reconcile() error {
 	// Reconcile Services
-	err := s.ServiceReconciler.Reconcile()
+	err := s.DeploymentReconciler.Reconcile()
 	if err != nil {
 		return err
 	}
-	// Reconcile StatefulSet
-	err = s.StatefulSetReconciler.Reconcile()
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -115,7 +104,7 @@ func updateCapabilities(capabilities []string, extraCapabilities []string, podSp
 	}
 }
 
-func (s *ServerReconciler) createStatefulSetReconciler(server *mlopsv1alpha1.Server, annotator *patch.Annotator) (*ServerStatefulSetReconciler, error) {
+func (s *ServerReconciler) createDeploymentReconciler(server *mlopsv1alpha1.Server, annotator *patch.Annotator) (*ServerDeploymentReconciler, error) {
 	//Get ServerConfig
 	serverConfig, err := mlopsv1alpha1.GetServerConfigForServer(server.Spec.ServerConfig, s.Client)
 	if err != nil {
@@ -132,12 +121,12 @@ func (s *ServerReconciler) createStatefulSetReconciler(server *mlopsv1alpha1.Ser
 	updateCapabilities(server.Spec.Capabilities, server.Spec.ExtraCapabilities, podSpec)
 
 	// Reconcile ReplicaSet
-	statefulSetReconciler := NewServerStatefulSetReconciler(s.ReconcilerConfig,
+	statefulSetReconciler := NewServerDeploymentReconciler(
+		s.ReconcilerConfig,
 		server.ObjectMeta,
 		podSpec,
 		serverConfig.Spec.VolumeClaimTemplates,
 		&server.Spec.ScalingSpec,
-		server.Spec.StatefulSetPersistentVolumeClaimRetentionPolicy,
 		serverConfig.ObjectMeta,
 		annotator)
 	return statefulSetReconciler, nil
