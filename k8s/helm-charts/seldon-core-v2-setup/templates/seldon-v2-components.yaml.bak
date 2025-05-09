@@ -1407,11 +1407,9 @@ spec:
       - mountPath: /mnt/agent
         name: mlserver-models
         readOnly: true
-{{- if .Values.security.envoy.ssl.downstream.client.serverValidationSecret }}
       - mountPath: /mnt/certs
         name: downstream-ca-certs
         readOnly: true
-{{- end }}
 {{- with .Values.imagePullSecrets }}
     imagePullSecrets:
     {{- toYaml . | nindent 8 }}
@@ -1422,12 +1420,10 @@ spec:
     terminationGracePeriodSeconds: {{ .Values.serverConfig.terminationGracePeriodSeconds
       }}
     volumes:
-{{- if .Values.security.envoy.ssl.downstream.client.serverValidationSecret }}
     - name: downstream-ca-certs
       secret:
         secretName: '{{ .Values.security.envoy.ssl.downstream.client.serverValidationSecret
           }}'
-{{- end }}
     - configMap:
         name: seldon-agent
       name: config-volume
